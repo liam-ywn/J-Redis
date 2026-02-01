@@ -4,18 +4,17 @@ import dev.yewintnaing.protocol.RespArray;
 import dev.yewintnaing.protocol.RespString;
 import dev.yewintnaing.storage.RedisStorage;
 
-class SetCommand implements RedisCommand {
+public class LPushCommand implements RedisCommand {
     @Override
     public String execute(RespArray args) {
 
-        if (args.elements().size() < 3) {
-            return "-ERR wrong number of arguments for 'set' command\r\n";
-        }
+        if (args.elements().size() < 3)
+            return "-ERR LPUSH requires key and value\r\n";
 
         String key = ((RespString) args.elements().get(1)).value();
         String val = ((RespString) args.elements().get(2)).value();
 
-        RedisStorage.putString(key, val);
+        RedisStorage.pushList(key, val);
 
         return "+OK\r\n";
     }

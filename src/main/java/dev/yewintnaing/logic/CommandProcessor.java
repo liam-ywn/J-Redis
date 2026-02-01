@@ -14,12 +14,13 @@ public class CommandProcessor {
         COMMANDS.put("SET", new SetCommand());
         COMMANDS.put("GET", new GetCommand());
         COMMANDS.put("EXPIRE", new ExpireCommand());
+        COMMANDS.put("LPUSH", new LPushCommand());
+        COMMANDS.put("LPOP", new LPopCommand());
     }
 
     public static String handle(RespArray request) {
         var elements = request.elements();
         String cmdName = ((RespString) elements.getFirst()).value().toUpperCase();
-
 
         RedisCommand command = COMMANDS.get(cmdName);
 

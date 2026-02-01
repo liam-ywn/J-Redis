@@ -7,8 +7,7 @@ public class CleanerTask {
 
     public static void init() {
         var scheduler = Executors.newSingleThreadScheduledExecutor(
-                Thread.ofPlatform().name("redis-clearner").factory()
-        );
+                Thread.ofPlatform().name("redis-clearner").factory());
 
         scheduler.scheduleAtFixedRate(RedisStorage::removeExpired, 5, 5, TimeUnit.SECONDS);
 

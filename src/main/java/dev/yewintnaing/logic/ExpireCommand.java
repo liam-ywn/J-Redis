@@ -8,9 +8,12 @@ class ExpireCommand implements RedisCommand {
     @Override
     public String execute(RespArray args) {
 
+        if (args.elements().size() < 3) {
+            return "-ERR wrong number of arguments for 'expire' command\r\n";
+        }
+
         String key = ((RespString) args.elements().get(1)).value();
         long seconds = Long.parseLong(((RespString) args.elements().get(2)).value());
-
 
         return RedisStorage.setExpiry(key, seconds) ? ":1\r\n" : ":0\r\n";
     }

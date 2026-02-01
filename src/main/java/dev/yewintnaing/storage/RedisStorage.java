@@ -1,55 +1,95 @@
 package dev.yewintnaing.storage;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+
 import java.util.Optional;
 
 public class RedisStorage {
-    
-    // Internal record to keep the logic encapsulated
-    public record ExpiringValue(String value, long expiryTime) {
-        public boolean isExpired() {
-            return expiryTime != 0 && System.currentTimeMillis() > expiryTime;
-        }
+
+    private static final ConcurrentHashMap<String, RedisValue> DATA = new ConcurrentHashMap<>();
+
+    public static void putString(String key, String value) {
+        DATA.put(key, new StringValue(value, 0));
     }
 
-    private static final ConcurrentHashMap<String, ExpiringValue> DATA = new ConcurrentHashMap<>();
+    public static Optional<String> getString(String key) {
+        RedisValue value = DATA.get(key);
 
-    public static void put(String key, String value, long expiryTime) {
-        DATA.put(key, new ExpiringValue(value, expiryTime));
-    }
+        if (value == null)
+            return Optional.empty();
 
-    public static void put(String key, String value) {
-        DATA.put(key, new ExpiringValue(value, 0));
-    }
-
-
-
-    public static Optional<String> get(String key) {
-        ExpiringValue entry = DATA.get(key);
-        
-        if (entry == null) return Optional.empty();
-
-        if (entry.isExpired()) {
-            DATA.remove(key); // Passive cleanup
+        if (value.isExpired()) {
+            DATA.remove(key);
             return Optional.empty();
         }
 
-        return Optional.of(entry.value());
+        if (value instanceof StringValue s) {
+            return Optional.of(s.value());
+        }
+
+        return Optional.empty();
+    }
+
+    public static void pushList(String key, String value) {
+        DATA.compute(key, (k, old) -> {
+
+            if (old == null) {
+                var listValue = new ListValue(new ConcurrentLinkedDeque<>(), 0);
+                listValue.value().addFirst(value);
+                return listValue;
+            }
+
+            if (old instanceof ListValue listValue) {
+                listValue.value().addFirst(value);
+                return listValue;
+            }
+
+            throw new IllegalStateException("Invalid Type");
+        });
+    }
+
+    public static Optional<String> popList(String key) {
+
+        String[] resultHolder = new String[1];
+
+        DATA.computeIfPresent(key, (k, old) -> {
+            if (old instanceof ListValue listValue) {
+
+                var deque = listValue.value();
+
+                if (!deque.isEmpty()) {
+                    resultHolder[0] = deque.pollFirst();
+                }
+
+                return deque.isEmpty() ? null : listValue;
+            }
+            return old;
+        });
+
+        return Optional.ofNullable(resultHolder[0]);
     }
 
     public static boolean setExpiry(String key, long seconds) {
         long expiryTime = System.currentTimeMillis() + (seconds * 1000L);
-        
-        // Atomic update: only update if the key actually exists
-        ExpiringValue updated = DATA.computeIfPresent(key, (k, old) -> 
-            new ExpiringValue(old.value(), expiryTime));
-            
+
+        RedisValue updated = DATA.computeIfPresent(key, (k, old) -> {
+
+            switch (old) {
+                case StringValue stringValue -> {
+                    return new StringValue(stringValue.value(), expiryTime);
+                }
+                case ListValue listValue -> {
+                    return new ListValue(listValue.value(), expiryTime);
+                }
+                default -> throw new IllegalStateException("Invalid Type");
+            }
+        });
+
         return updated != null;
     }
 
-    // This is where your background cleaner will call
     public static void removeExpired() {
-        long now = System.currentTimeMillis();
         DATA.entrySet().removeIf(entry -> entry.getValue().isExpired());
     }
 }
