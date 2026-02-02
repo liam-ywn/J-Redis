@@ -31,7 +31,46 @@ public class RedisStorage {
         return Optional.empty();
     }
 
+    public static Optional<Long> getLength(String key) {
+        RedisValue value = DATA.get(key);
+
+        if (value == null)
+            return Optional.empty();
+
+        if (value.isExpired()) {
+            DATA.remove(key);
+            return Optional.of(0L);
+        }
+
+        if (value instanceof ListValue listValue) {
+            return Optional.of((long) listValue.value().size());
+        }
+
+        return Optional.of(0L);
+    }
+
+    public static Optional<ListValue> getList(String key) {
+        RedisValue value = DATA.get(key);
+
+        if (value == null)
+            return Optional.empty();
+
+        if (value.isExpired()) {
+            DATA.remove(key);
+            return Optional.empty();
+        }
+
+        if (value instanceof ListValue listValue) {
+            return Optional.of(listValue);
+        }
+
+        return Optional.empty();
+    }
+
     public static void pushList(String key, String value) {
+
+//        DATA.computeIfAbsent(key, s ->  new StringValue(value, 0));
+
         DATA.compute(key, (k, old) -> {
 
             if (old == null) {
@@ -45,8 +84,11 @@ public class RedisStorage {
                 return listValue;
             }
 
-            throw new IllegalStateException("Invalid Type");
-        });
+            throw new IllegalStateException("Invalid type!");
+        }
+        );
+
+
     }
 
     public static Optional<String> popList(String key) {

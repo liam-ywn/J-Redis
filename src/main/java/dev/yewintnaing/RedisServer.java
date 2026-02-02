@@ -16,7 +16,7 @@ public class RedisServer {
         CleanerTask.init();
 
         try (var serverSocket = new ServerSocket(port);
-             var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 
             System.out.println("J-Redis is running on port " + port);
 
@@ -29,6 +29,5 @@ public class RedisServer {
         }
 
     }
-
 
 }

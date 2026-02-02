@@ -16,6 +16,7 @@ public class CommandProcessor {
         COMMANDS.put("EXPIRE", new ExpireCommand());
         COMMANDS.put("LPUSH", new LPushCommand());
         COMMANDS.put("LPOP", new LPopCommand());
+        COMMANDS.put("LLEN", new LLenCommand());
     }
 
     public static String handle(RespArray request) {
