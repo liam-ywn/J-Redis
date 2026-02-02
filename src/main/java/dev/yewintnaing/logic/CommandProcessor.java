@@ -17,6 +17,7 @@ public class CommandProcessor {
         COMMANDS.put("LPUSH", new LPushCommand());
         COMMANDS.put("LPOP", new LPopCommand());
         COMMANDS.put("LLEN", new LLenCommand());
+        COMMANDS.put("LRANGE", new LRangeCommand());
     }
 
     public static String handle(RespArray request) {

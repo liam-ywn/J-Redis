@@ -1,5 +1,8 @@
 package dev.yewintnaing.storage;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -73,19 +76,19 @@ public class RedisStorage {
 
         DATA.compute(key, (k, old) -> {
 
-            if (old == null) {
-                var listValue = new ListValue(new ConcurrentLinkedDeque<>(), 0);
-                listValue.value().addFirst(value);
-                return listValue;
-            }
+                    if (old == null) {
+                        var listValue = new ListValue(new ConcurrentLinkedDeque<>(), 0);
+                        listValue.value().addFirst(value);
+                        return listValue;
+                    }
 
-            if (old instanceof ListValue listValue) {
-                listValue.value().addFirst(value);
-                return listValue;
-            }
+                    if (old instanceof ListValue listValue) {
+                        listValue.value().addFirst(value);
+                        return listValue;
+                    }
 
-            throw new IllegalStateException("Invalid type!");
-        }
+                    throw new IllegalStateException("Invalid type!");
+                }
         );
 
 
@@ -134,4 +137,43 @@ public class RedisStorage {
     public static void removeExpired() {
         DATA.entrySet().removeIf(entry -> entry.getValue().isExpired());
     }
+
+    public static Optional<List<String>> getListRange(String key, long start, long stop) {
+
+        RedisValue value = DATA.get(key);
+
+        if (value == null)
+            return Optional.empty();
+
+        if (!(value instanceof ListValue listValue)) {
+            throw new IllegalStateException("Invalid Type!");
+        }
+
+        var deque = listValue.value();
+
+        var size = deque.size();
+
+        // 1. Normalize Indices (Handle negatives)
+        long normalizedStart = (start < 0) ? Math.max(0, size + start) : start;
+        long normalizedStop = (stop < 0) ? size + stop : stop;
+
+        // 2. Bound Check
+        if (normalizedStart >= size || normalizedStart > normalizedStop) {
+            return Optional.of(List.of());
+        }
+
+        // Ensure we don't go past the end of the list
+        normalizedStop = Math.min(normalizedStop, size - 1);
+
+        // 3. Extract the Range
+        // Using streams to skip and limit is much cleaner than a manual loop with peek()
+        List<String> result = deque.stream()
+                .skip(normalizedStart)
+                .limit(normalizedStop - normalizedStart + 1)
+                .toList();
+
+        return Optional.of(result);
+    }
+
+
 }
