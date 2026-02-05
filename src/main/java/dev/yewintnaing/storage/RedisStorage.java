@@ -1,26 +1,56 @@
 package dev.yewintnaing.storage;
 
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
-
-import java.util.Optional;
 
 public class RedisStorage {
 
     private static final ConcurrentHashMap<String, RedisValue> DATA = new ConcurrentHashMap<>();
 
+    public static long incr(String key) {
+
+        var data = (LongValue) DATA.compute(key, (k, old) -> {
+            if (old == null) {
+                return new LongValue(1L);
+            }
+
+            if (old instanceof LongValue(long value)) {
+                return new LongValue(value + 1);
+            }
+
+            if (old instanceof StringValue value) {
+
+                try {
+                    long longValue = Long.parseLong(value.value());
+                    return new LongValue(longValue + 1);
+                } catch (Exception e) {
+                    throw new IllegalStateException("Invalid type!");
+                }
+
+            }
+
+            throw new IllegalStateException("Invalid type!");
+
+        });
+
+        return data.value();
+
+    }
+
     public static void putString(String key, String value) {
+
         DATA.put(key, new StringValue(value, 0));
     }
 
     public static Optional<String> getString(String key) {
+
         RedisValue value = DATA.get(key);
 
-        if (value == null)
+        if (value == null) {
             return Optional.empty();
+        }
 
         if (value.isExpired()) {
             DATA.remove(key);
@@ -31,14 +61,20 @@ public class RedisStorage {
             return Optional.of(s.value());
         }
 
+        if (value instanceof LongValue l) {
+            return Optional.of(String.valueOf(l.value()));
+        }
+
         return Optional.empty();
     }
 
     public static Optional<Long> getLength(String key) {
+
         RedisValue value = DATA.get(key);
 
-        if (value == null)
+        if (value == null) {
             return Optional.empty();
+        }
 
         if (value.isExpired()) {
             DATA.remove(key);
@@ -53,10 +89,12 @@ public class RedisStorage {
     }
 
     public static Optional<ListValue> getList(String key) {
+
         RedisValue value = DATA.get(key);
 
-        if (value == null)
+        if (value == null) {
             return Optional.empty();
+        }
 
         if (value.isExpired()) {
             DATA.remove(key);
@@ -72,25 +110,23 @@ public class RedisStorage {
 
     public static void pushList(String key, String value) {
 
-//        DATA.computeIfAbsent(key, s ->  new StringValue(value, 0));
+        // DATA.computeIfAbsent(key, s -> new StringValue(value, 0));
 
         DATA.compute(key, (k, old) -> {
 
-                    if (old == null) {
-                        var listValue = new ListValue(new ConcurrentLinkedDeque<>(), 0);
-                        listValue.value().addFirst(value);
-                        return listValue;
-                    }
+            if (old == null) {
+                var listValue = new ListValue(new ConcurrentLinkedDeque<>(), 0);
+                listValue.value().addFirst(value);
+                return listValue;
+            }
 
-                    if (old instanceof ListValue listValue) {
-                        listValue.value().addFirst(value);
-                        return listValue;
-                    }
+            if (old instanceof ListValue listValue) {
+                listValue.value().addFirst(value);
+                return listValue;
+            }
 
-                    throw new IllegalStateException("Invalid type!");
-                }
-        );
-
+            throw new IllegalStateException("Invalid type!");
+        });
 
     }
 
@@ -116,6 +152,7 @@ public class RedisStorage {
     }
 
     public static boolean setExpiry(String key, long seconds) {
+
         long expiryTime = System.currentTimeMillis() + (seconds * 1000L);
 
         RedisValue updated = DATA.computeIfPresent(key, (k, old) -> {
@@ -135,6 +172,7 @@ public class RedisStorage {
     }
 
     public static void removeExpired() {
+
         DATA.entrySet().removeIf(entry -> entry.getValue().isExpired());
     }
 
@@ -142,8 +180,9 @@ public class RedisStorage {
 
         RedisValue value = DATA.get(key);
 
-        if (value == null)
+        if (value == null) {
             return Optional.empty();
+        }
 
         if (!(value instanceof ListValue listValue)) {
             throw new IllegalStateException("Invalid Type!");
@@ -166,7 +205,8 @@ public class RedisStorage {
         normalizedStop = Math.min(normalizedStop, size - 1);
 
         // 3. Extract the Range
-        // Using streams to skip and limit is much cleaner than a manual loop with peek()
+        // Using streams to skip and limit is much cleaner than a manual loop with
+        // peek()
         List<String> result = deque.stream()
                 .skip(normalizedStart)
                 .limit(normalizedStop - normalizedStart + 1)
@@ -174,6 +214,5 @@ public class RedisStorage {
 
         return Optional.of(result);
     }
-
 
 }
