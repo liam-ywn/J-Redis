@@ -14,12 +14,20 @@ import java.nio.charset.StandardCharsets;
 
 import dev.yewintnaing.logic.CommandProcessor;
 import dev.yewintnaing.logic.PubSubManager;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class ClientHandler implements Runnable {
 
     private final Socket socket;
-    private OutputStream out;
     private final CommandProcessor commandProcessor;
+    private final Set<String> subscriptions = ConcurrentHashMap.newKeySet();
+    private final BlockingQueue<String> outputQueue = new LinkedBlockingQueue<>(50); // Smaller queue for faster
+                                                                                     // detection
+    private static final int MAX_SUBSCRIPTIONS = 100;
+    private Thread writerThread;
 
     public ClientHandler(Socket socket) {
         this.socket = socket;
@@ -28,12 +36,10 @@ public class ClientHandler implements Runnable {
 
     @Override
     public void run() {
-        try (socket;
-                InputStream in = new BufferedInputStream(socket.getInputStream());
-                OutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
+        // Start writer thread
+        writerThread = Thread.ofVirtual().start(this::writeLoop);
 
-            this.out = out;
-
+        try (InputStream in = new BufferedInputStream(socket.getInputStream())) {
             while (!socket.isClosed()) {
                 RespType request = RespParser.readResp(in);
                 if (request == null) {
@@ -47,35 +53,72 @@ public class ClientHandler implements Runnable {
                     }
 
                     String respResponse = commandProcessor.handle(commandArray, this);
-                    sendMessage(respResponse);
+                    if (respResponse != null) {
+                        sendMessage(respResponse);
+                    }
 
                 } catch (Exception e) {
                     writeError(e.getMessage());
                     System.err.println("Protocol error: " + e.getMessage());
                 }
             }
-
         } catch (IOException e) {
             System.err.println("Client disconnected: " + e.getMessage());
         } finally {
-            // Cleanup subscriptions if necessary
-            PubSubManager.getInstance().unsubscribeAll(this);
+            close();
         }
     }
 
-    public synchronized void sendMessage(String message) {
-        if (out == null || socket.isClosed())
-            return;
-        try {
-            out.write(message.getBytes(StandardCharsets.UTF_8));
-            out.flush();
-        } catch (IOException e) {
-            System.err.println("Error sending message to client: " + e.getMessage());
-            try {
-                socket.close();
-            } catch (IOException ex) {
-                // Ignore
+    private void writeLoop() {
+        try (OutputStream out = new BufferedOutputStream(socket.getOutputStream())) {
+            while (!socket.isClosed()) {
+                String message = outputQueue.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+                if (message == null) {
+                    continue; // Timeout, check if socket closed
+                }
+
+                long startTime = System.currentTimeMillis();
+                out.write(message.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                long writeTime = System.currentTimeMillis() - startTime;
+
+                // If write takes too long, client is slow
+                if (writeTime > 1000) { // 1 second threshold
+                    System.err.println(
+                            "Client " + socket + " write took " + writeTime + "ms. Disconnecting slow client.");
+                    break;
+                }
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            // Socket closed or error
+        } finally {
+            close();
+        }
+    }
+
+    public boolean addSubscription(String channel) {
+        if (subscriptions.size() >= MAX_SUBSCRIPTIONS) {
+            return false;
+        }
+        return subscriptions.add(channel);
+    }
+
+    public void removeSubscription(String channel) {
+        subscriptions.remove(channel);
+    }
+
+    public Set<String> getSubscriptions() {
+        return subscriptions;
+    }
+
+    public void sendMessage(String message) {
+        if (socket.isClosed())
+            return;
+        if (!outputQueue.offer(message)) {
+            System.err.println("Client " + socket + " is too slow. Disconnecting.");
+            close();
         }
     }
 
@@ -84,4 +127,15 @@ public class ClientHandler implements Runnable {
         sendMessage("-ERR " + safe + "\r\n");
     }
 
+    private void close() {
+        try {
+            PubSubManager.getInstance().unsubscribeAll(this);
+            socket.close();
+            if (writerThread != null) {
+                writerThread.interrupt();
+            }
+        } catch (IOException e) {
+            // Ignore
+        }
+    }
 }

@@ -25,15 +25,19 @@ public class SubscribeCommand implements RedisCommand {
             RespType element = elements.get(i);
             if (element instanceof RespBulkString channelName) {
                 String channel = channelName.asUtf8();
-                PubSubManager.getInstance().subscribe(channel, client);
-                subscribedCount++; // This is loose; normally it's total subs for client.
+                try {
+                    PubSubManager.getInstance().subscribe(channel, client);
+                    subscribedCount++; // This is loose; normally it's total subs for client.
 
-                // Push subscription message immediately
-                // *3\r\n$9\r\nsubscribe\r\n$<len>\r\n<channel>\r\n:<count>\r\n
-                response.append("*3\r\n");
-                response.append("$9\r\nsubscribe\r\n");
-                response.append("$").append(channel.length()).append("\r\n").append(channel).append("\r\n");
-                response.append(":").append(subscribedCount).append("\r\n");
+                    // Push subscription message immediately
+                    // *3\r\n$9\r\nsubscribe\r\n$<len>\r\n<channel>\r\n:<count>\r\n
+                    response.append("*3\r\n");
+                    response.append("$9\r\nsubscribe\r\n");
+                    response.append("$").append(channel.length()).append("\r\n").append(channel).append("\r\n");
+                    response.append(":").append(subscribedCount).append("\r\n");
+                } catch (RuntimeException e) {
+                    return "-ERR " + e.getMessage() + "\r\n";
+                }
             }
         }
 
