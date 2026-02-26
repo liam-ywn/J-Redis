@@ -130,6 +130,94 @@ public class RedisStorage {
 
     }
 
+    public static int hset(String key, String field, String value) {
+
+        DATA.compute(key, (k, old) -> {
+            if (old == null) {
+                var map = new java.util.concurrent.ConcurrentHashMap<String, String>();
+                map.put(field, value);
+                return new HashValue(map, 0);
+            }
+
+            if (old instanceof HashValue hv) {
+                hv.value().put(field, value);
+                return hv;
+            }
+
+            throw new IllegalStateException("Invalid type!");
+        });
+
+        return 1;
+    }
+
+    public static Optional<String> hget(String key, String field) {
+
+        RedisValue value = DATA.get(key);
+
+        if (value == null || value.isExpired()) {
+            if (value != null)
+                DATA.remove(key);
+            return Optional.empty();
+        }
+
+        if (value instanceof HashValue hv) {
+            return Optional.ofNullable(hv.value().get(field));
+        }
+
+        throw new IllegalStateException("Invalid type!");
+    }
+
+    public static int hdel(String key, String field) {
+
+        int[] result = new int[1];
+
+        DATA.computeIfPresent(key, (k, old) -> {
+            if (old instanceof HashValue hv) {
+                if (hv.value().remove(field) != null) {
+                    result[0] = 1;
+                }
+                return hv.value().isEmpty() ? null : hv;
+            }
+            return old;
+        });
+
+        return result[0];
+    }
+
+    public static long hlen(String key) {
+
+        RedisValue value = DATA.get(key);
+
+        if (value == null || value.isExpired()) {
+            if (value != null)
+                DATA.remove(key);
+            return 0;
+        }
+
+        if (value instanceof HashValue hv) {
+            return hv.value().size();
+        }
+
+        throw new IllegalStateException("Invalid type!");
+    }
+
+    public static Optional<java.util.Map<String, String>> hgetall(String key) {
+
+        RedisValue value = DATA.get(key);
+
+        if (value == null || value.isExpired()) {
+            if (value != null)
+                DATA.remove(key);
+            return Optional.empty();
+        }
+
+        if (value instanceof HashValue hv) {
+            return Optional.of(hv.value());
+        }
+
+        throw new IllegalStateException("Invalid type!");
+    }
+
     public static Optional<String> popList(String key) {
 
         String[] resultHolder = new String[1];
@@ -163,6 +251,9 @@ public class RedisStorage {
                 }
                 case ListValue listValue -> {
                     return new ListValue(listValue.value(), expiryTime);
+                }
+                case HashValue hashValue -> {
+                    return new HashValue(hashValue.value(), expiryTime);
                 }
                 default -> throw new IllegalStateException("Invalid Type");
             }

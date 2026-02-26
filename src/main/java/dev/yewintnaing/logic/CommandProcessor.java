@@ -22,6 +22,11 @@ public class CommandProcessor {
         COMMANDS.put("LRANGE", new LRangeCommand());
         COMMANDS.put("SUBSCRIBE", new SubscribeCommand());
         COMMANDS.put("PUBLISH", new PublishCommand());
+        COMMANDS.put("HSET", new HSetCommand());
+        COMMANDS.put("HGET", new HGetCommand());
+        COMMANDS.put("HDEL", new HDelCommand());
+        COMMANDS.put("HLEN", new HLenCommand());
+        COMMANDS.put("HGETALL", new HGetAllCommand());
     }
 
     public String handle(RespArray request, dev.yewintnaing.handler.ClientHandler client) {
