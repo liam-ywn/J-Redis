@@ -21,6 +21,7 @@ public class CommandProcessor {
         COMMANDS.put("INCR", new IncrCommand());
         COMMANDS.put("LRANGE", new LRangeCommand());
         COMMANDS.put("SUBSCRIBE", new SubscribeCommand());
+        COMMANDS.put("UNSUBSCRIBE", new UnsubscribeCommand());
         COMMANDS.put("PUBLISH", new PublishCommand());
         COMMANDS.put("HSET", new HSetCommand());
         COMMANDS.put("HGET", new HGetCommand());
