@@ -28,6 +28,10 @@ public class CommandProcessor {
         COMMANDS.put("HDEL", new HDelCommand());
         COMMANDS.put("HLEN", new HLenCommand());
         COMMANDS.put("HGETALL", new HGetAllCommand());
+        COMMANDS.put("DEL", new DelCommand());
+        COMMANDS.put("EXISTS", new ExistsCommand());
+        COMMANDS.put("KEYS", new KeysCommand());
+        COMMANDS.put("TTL", new TTLCommand());
     }
 
     public String handle(RespArray request, dev.yewintnaing.handler.ClientHandler client) {

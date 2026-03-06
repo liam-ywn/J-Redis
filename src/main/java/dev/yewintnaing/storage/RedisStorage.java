@@ -296,14 +296,63 @@ public class RedisStorage {
         normalizedStop = Math.min(normalizedStop, size - 1);
 
         // 3. Extract the Range
-        // Using streams to skip and limit is much cleaner than a manual loop with
-        // peek()
         List<String> result = deque.stream()
                 .skip(normalizedStart)
                 .limit(normalizedStop - normalizedStart + 1)
                 .toList();
 
         return Optional.of(result);
+    }
+
+    public static int del(String... keys) {
+        int removed = 0;
+        for (String key : keys) {
+            if (DATA.remove(key) != null) {
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    public static int exists(String... keys) {
+        int count = 0;
+        for (String key : keys) {
+            RedisValue value = DATA.get(key);
+            if (value != null) {
+                if (value.isExpired()) {
+                    DATA.remove(key);
+                } else {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    public static List<String> keys(String pattern) {
+        // Simple pattern matching: supports only '*' for now
+        if ("*".equals(pattern)) {
+            removeExpired();
+            return DATA.keySet().stream().toList();
+        }
+        return List.of();
+    }
+
+    public static long getTTL(String key) {
+        RedisValue value = DATA.get(key);
+        if (value == null) {
+            return -2;
+        }
+        if (value.isExpired()) {
+            DATA.remove(key);
+            return -2;
+        }
+        long ttl = value.expiryTime();
+        if (ttl == 0) {
+            return -1;
+        }
+        long remaining = (ttl - System.currentTimeMillis()) / 1000;
+        return Math.max(0, remaining);
     }
 
 }
