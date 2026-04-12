@@ -245,6 +245,18 @@ public class PersistenceManager {
             for (var entry : hv.value().entrySet()) {
                 cmds.add(createCommand("HSET", key, entry.getKey(), entry.getValue()));
             }
+        } else if (value instanceof SetValue sv) {
+            if (!sv.value().isEmpty()) {
+                List<String> command = new ArrayList<>();
+                command.add("SADD");
+                command.add(key);
+                command.addAll(sv.value());
+                cmds.add(createCommand(command.toArray(String[]::new)));
+            }
+        } else if (value instanceof ZSetValue zv) {
+            for (SkipList.Node node : zv.index().range(0, zv.index().size() - 1)) {
+                cmds.add(createCommand("ZADD", key, Double.toString(node.score), node.member));
+            }
         }
 
         if (value.expiryTime() > 0) {

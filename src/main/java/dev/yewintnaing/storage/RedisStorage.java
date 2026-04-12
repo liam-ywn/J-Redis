@@ -286,6 +286,9 @@ public class RedisStorage {
                 case SetValue setValue -> {
                     return new SetValue(setValue.value(), expiryTime);
                 }
+                case ZSetValue zSetValue -> {
+                    return new ZSetValue(zSetValue.memberScores(), zSetValue.index(), expiryTime);
+                }
                 default -> throw new IllegalStateException("Invalid Type");
             }
         });
@@ -466,6 +469,148 @@ public class RedisStorage {
             return sv.value().size();
         }
         throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value");
+    }
+
+    public static int zadd(String key, double score, String member) {
+        var added = new int[1];
+
+        DATA.compute(key, (k, old) -> {
+            if (old == null || old.isExpired()) {
+                var memberScores = new ConcurrentHashMap<String, Double>();
+                var skipList = new SkipList();
+                memberScores.put(member, score);
+                skipList.insert(member, score);
+                added[0] = 1;
+                return new ZSetValue(memberScores, skipList, 0);
+            }
+
+            if (old instanceof ZSetValue zSetValue) {
+                Double existingScore = zSetValue.memberScores().get(member);
+                if (existingScore != null) {
+                    if (Double.compare(existingScore, score) == 0) {
+                        return zSetValue;
+                    }
+                    zSetValue.index().delete(member, existingScore);
+                } else {
+                    added[0] = 1;
+                }
+
+                zSetValue.memberScores().put(member, score);
+                zSetValue.index().insert(member, score);
+                return zSetValue;
+            }
+
+            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value");
+        });
+
+        return added[0];
+    }
+
+    public static Optional<List<String>> zrange(String key, long start, long stop, boolean withScores) {
+        RedisValue value = DATA.get(key);
+        if (value == null || value.isExpired()) {
+            if (value != null) {
+                DATA.remove(key);
+            }
+            return Optional.empty();
+        }
+
+        if (!(value instanceof ZSetValue zSetValue)) {
+            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value");
+        }
+
+        int size = zSetValue.index().size();
+        int normalizedStart = normalizeRangeIndex(start, size);
+        int normalizedStop = normalizeRangeIndex(stop, size);
+
+        if (normalizedStart >= size || normalizedStop < normalizedStart) {
+            return Optional.of(List.of());
+        }
+
+        List<String> response = new java.util.ArrayList<>();
+        for (SkipList.Node node : zSetValue.index().range(normalizedStart, normalizedStop)) {
+            response.add(node.member);
+            if (withScores) {
+                response.add(formatScore(node.score));
+            }
+        }
+        return Optional.of(response);
+    }
+
+    public static int zrem(String key, String... members) {
+        var removed = new int[1];
+
+        DATA.computeIfPresent(key, (k, old) -> {
+            if (old.isExpired()) {
+                return null;
+            }
+
+            if (old instanceof ZSetValue zSetValue) {
+                for (String member : members) {
+                    Double score = zSetValue.memberScores().remove(member);
+                    if (score != null) {
+                        zSetValue.index().delete(member, score);
+                        removed[0]++;
+                    }
+                }
+                return zSetValue.memberScores().isEmpty() ? null : zSetValue;
+            }
+
+            throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value");
+        });
+
+        return removed[0];
+    }
+
+    public static Optional<String> zscore(String key, String member) {
+        RedisValue value = DATA.get(key);
+        if (value == null || value.isExpired()) {
+            if (value != null) {
+                DATA.remove(key);
+            }
+            return Optional.empty();
+        }
+
+        if (value instanceof ZSetValue zSetValue) {
+            Double score = zSetValue.memberScores().get(member);
+            return score == null ? Optional.empty() : Optional.of(formatScore(score));
+        }
+
+        throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value");
+    }
+
+    public static int zcard(String key) {
+        RedisValue value = DATA.get(key);
+        if (value == null || value.isExpired()) {
+            if (value != null) {
+                DATA.remove(key);
+            }
+            return 0;
+        }
+
+        if (value instanceof ZSetValue zSetValue) {
+            return zSetValue.memberScores().size();
+        }
+
+        throw new IllegalStateException("WRONGTYPE Operation against a key holding the wrong kind of value");
+    }
+
+    private static int normalizeRangeIndex(long index, int size) {
+        long normalized = index < 0 ? size + index : index;
+        if (normalized < 0) {
+            return 0;
+        }
+        if (normalized >= size) {
+            return size;
+        }
+        return (int) normalized;
+    }
+
+    private static String formatScore(double score) {
+        if (score == Math.rint(score)) {
+            return String.format(java.util.Locale.ROOT, "%.1f", score);
+        }
+        return Double.toString(score);
     }
 
 }

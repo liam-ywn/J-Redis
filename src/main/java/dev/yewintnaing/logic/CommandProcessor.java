@@ -40,6 +40,11 @@ public class CommandProcessor {
         COMMANDS.put("SMEMBERS", new SMembersCommand());
         COMMANDS.put("SISMEMBER", new SIsMemberCommand());
         COMMANDS.put("SCARD", new SCardCommand());
+        COMMANDS.put("ZADD", new ZAddCommand());
+        COMMANDS.put("ZRANGE", new ZRangeCommand());
+        COMMANDS.put("ZREM", new ZRemCommand());
+        COMMANDS.put("ZSCORE", new ZScoreCommand());
+        COMMANDS.put("ZCARD", new ZCardCommand());
     }
 
     public String handle(RespArray request, dev.yewintnaing.handler.ClientHandler client) {

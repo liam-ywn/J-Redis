@@ -1,11 +1,11 @@
 package dev.yewintnaing.storage;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 /**
  * A standalone Skip List implementation for Sorted Sets.
- * 
- * TODO: Implement the 'insert' and 'delete' methods.
  */
 public class SkipList {
     private static final int MAX_LEVEL = 32;
@@ -73,18 +73,6 @@ public class SkipList {
         return null;
     }
 
-    /**
-     * Inserts a new member with a given score.
-     * 
-     * TODO: Implement the insertion logic.
-     * Steps:
-     * 1. Create an 'update' array of size MAX_LEVEL.
-     * 2. Search for the insertion point, saving the last node at each level in
-     * 'update'.
-     * 3. Generate a random level for the new node.
-     * 4. Update levelCount if the new level is higher.
-     * 5. Create the new node and link it into each level using the 'update' array.
-     */
     public void insert(String member, double score) {
         Node[] update = new Node[MAX_LEVEL];
         Node current = header;
@@ -120,19 +108,7 @@ public class SkipList {
         size++;
     }
 
-    /**
-     * Deletes a member with a given score.
-     * 
-     * TODO: Implement the deletion logic.
-     * Steps:
-     * 1. Create an 'update' array.
-     * 2. Search for the node, saving the path in 'update'.
-     * 3. If the node is found, update the 'forward' pointers of 'update' nodes to
-     * skip it.
-     * 4. Update levelCount if the highest level is now empty.
-     */
     public void delete(String member, double score) {
-        // TODO: Implement me!
         Node[] update = new Node[MAX_LEVEL];
         Node current = header;
 
@@ -169,6 +145,26 @@ public class SkipList {
         }
 
         size--;
+    }
+
+    public List<Node> range(int startInclusive, int stopInclusive) {
+        if (startInclusive < 0 || stopInclusive < startInclusive || startInclusive >= size) {
+            return List.of();
+        }
+
+        List<Node> result = new ArrayList<>();
+        Node current = header.forward[0];
+        int index = 0;
+
+        while (current != null && index <= stopInclusive) {
+            if (index >= startInclusive) {
+                result.add(current);
+            }
+            current = current.forward[0];
+            index++;
+        }
+
+        return result;
     }
 
     public int size() {

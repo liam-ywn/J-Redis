@@ -102,6 +102,28 @@ class PersistenceTest {
                 "Recovery should replay AOF without appending duplicate commands");
     }
 
+    @Test
+    void testAofRewriteRecoveryPreservesSortedSet() throws IOException {
+        RedisStorage.zadd("leaders", 10.0, "alice");
+        PersistenceManager.log(createCommand("ZADD", "leaders", "10.0", "alice"));
+
+        RedisStorage.zadd("leaders", 20.0, "carol");
+        PersistenceManager.log(createCommand("ZADD", "leaders", "20.0", "carol"));
+
+        RedisStorage.zadd("leaders", 15.0, "bob");
+        PersistenceManager.log(createCommand("ZADD", "leaders", "15.0", "bob"));
+
+        PersistenceManager.sync();
+        PersistenceManager.rewriteAof();
+        RedisStorage.clear();
+        RedisServer.recovery();
+
+        assertEquals(List.of("alice", "bob", "carol"),
+                RedisStorage.zrange("leaders", 0, -1, false).orElseThrow());
+        assertEquals(List.of("alice", "10.0", "bob", "15.0", "carol", "20.0"),
+                RedisStorage.zrange("leaders", 0, -1, true).orElseThrow());
+    }
+
     private RespArray createCommand(String... parts) {
         java.util.List<dev.yewintnaing.protocol.RespType> elements = new java.util.ArrayList<>();
         for (String part : parts) {
