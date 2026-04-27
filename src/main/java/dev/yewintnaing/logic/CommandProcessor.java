@@ -18,6 +18,7 @@ public class CommandProcessor {
         COMMANDS.put("EXPIRE", new ExpireCommand());
         COMMANDS.put("LPUSH", new LPushCommand());
         COMMANDS.put("RPUSH", new RPushCommand());
+        COMMANDS.put("RPOP", new RPopCommand());
         COMMANDS.put("LPOP", new LPopCommand());
         COMMANDS.put("LLEN", new LLenCommand());
         COMMANDS.put("INCR", new IncrCommand());
@@ -45,11 +46,14 @@ public class CommandProcessor {
         COMMANDS.put("ZREM", new ZRemCommand());
         COMMANDS.put("ZSCORE", new ZScoreCommand());
         COMMANDS.put("ZCARD", new ZCardCommand());
+        COMMANDS.put("MGET", new MGetCommand());
+        COMMANDS.put("MSET", new MSetCommand());
     }
 
     public String handle(RespArray request, dev.yewintnaing.handler.ClientHandler client) {
         return handle(request, client, true);
     }
+
 
     public String handle(RespArray request, dev.yewintnaing.handler.ClientHandler client, boolean persistWrite) {
         var elements = request.elements();

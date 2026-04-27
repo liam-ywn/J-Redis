@@ -158,6 +158,30 @@ public class RedisStorage {
 
     }
 
+    public static Optional<String> popListRight(String key) {
+
+        String[] resultHolder = new String[1];
+
+        DATA.computeIfPresent(key, (k, old) -> {
+            if (old.isExpired()) {
+                return null;
+            }
+
+            if (old instanceof ListValue listValue) {
+                var deque = listValue.value();
+
+                resultHolder[0] = deque.pollLast();
+
+                return deque.isEmpty() ? null : listValue;
+            }
+
+            throw new IllegalStateException("Invalid type!");
+        });
+
+        return Optional.ofNullable(resultHolder[0]);
+
+    }
+
     public static int hset(String key, String field, String value) {
 
         DATA.compute(key, (k, old) -> {

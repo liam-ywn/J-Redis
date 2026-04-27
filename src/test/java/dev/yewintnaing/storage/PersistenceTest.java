@@ -1,6 +1,7 @@
 package dev.yewintnaing.storage;
 
 import dev.yewintnaing.RedisServer;
+import dev.yewintnaing.logic.CommandProcessor;
 import dev.yewintnaing.logic.LRangeCommand;
 import dev.yewintnaing.protocol.RespArray;
 import dev.yewintnaing.protocol.RespBulkString;
@@ -122,6 +123,20 @@ class PersistenceTest {
                 RedisStorage.zrange("leaders", 0, -1, false).orElseThrow());
         assertEquals(List.of("alice", "10.0", "bob", "15.0", "carol", "20.0"),
                 RedisStorage.zrange("leaders", 0, -1, true).orElseThrow());
+    }
+
+    @Test
+    void testMSetIsPersistedAndRecovered() throws IOException {
+        CommandProcessor processor = new CommandProcessor();
+
+        assertEquals("+OK\r\n", processor.handle(createCommand("MSET", "name", "yewint", "city", "yangon"), null));
+        PersistenceManager.sync();
+
+        RedisStorage.clear();
+        RedisServer.recovery();
+
+        assertEquals("yewint", RedisStorage.getString("name").orElseThrow());
+        assertEquals("yangon", RedisStorage.getString("city").orElseThrow());
     }
 
     private RespArray createCommand(String... parts) {
